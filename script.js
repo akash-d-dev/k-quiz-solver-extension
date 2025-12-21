@@ -23,12 +23,14 @@ class QuizSolver {
     this.X_API_KEY = localStorage.getItem('X_API_KEY') || ''
     this.delay = 30
     this.autoStart = '0'
-    this.AI_MODEL = 'gemini-2.5-flash'
+    this.bypassEnabled = '1'
+    this.AI_MODEL = localStorage.getItem('AI_MODEL') || 'gemini-2.5-flash'
     this.modal = null
     this.modalContent
     this.toggleModalBtn
     this.closeModelBtn
     this.quizData = null;
+    this.serverWakeUpTimeStamp = 0;
     this.syncKeysFromChromeStorage();
   }
 
@@ -88,22 +90,24 @@ class QuizSolver {
   }
 
   async reset() {
+    this.removeModalWindow(); // Clean up existing modal before resetting
     this.ansArray = [-1, -1, -1, -1, -1];
     this.ansData = [null, null, null, null, null];
     this.currentQuestion = 0;
     this.G_API_KEY = localStorage.getItem('G_API_KEY') || '';
     this.C_API_KEY = localStorage.getItem('C_API_KEY') || '';
     this.X_API_KEY = localStorage.getItem('X_API_KEY') || '';
-    this.AI_MODEL = 'gemini-2.5-flash'
+    this.AI_MODEL = localStorage.getItem('AI_MODEL') || 'gemini-2.5-flash'
     this.modal = null;
     this.modalContent = undefined;
     this.toggleModalBtn = undefined;
     this.closeModelBtn = undefined;
     this.quizData = null;
-
+    this.serverWakeUpTimeStamp = 0;
     await this.syncKeysFromChromeStorage();
-    this.AI_MODEL = await this.getAiModel()
-}
+    this.AI_MODEL = await this.getAiModel();
+    localStorage.setItem('AI_MODEL', this.AI_MODEL);
+  }
 
   createButton(text, bgColor, margin, onClick) {
     const btn = Object.assign(document.createElement('button'), {
@@ -115,6 +119,8 @@ class QuizSolver {
   }
 
   createModalWindow() {
+    this.removeModalWindow(); // Ensure any existing modal is removed
+
     this.modal = Object.assign(document.createElement('div'), {
       style: `
             position: fixed; top: 50px; right: 20px; background: #fff; padding: 20px;
@@ -288,6 +294,43 @@ class QuizSolver {
     })
   }
 
+  getBypassFullscreen() {
+    return new Promise((resolve) => {
+      if (!QuizSolver.isChromeRuntimeAvailable()) {
+        resolve('1');
+        return;
+      }
+      
+      if (!chrome.storage || !chrome.storage.sync) {
+        resolve('1');
+        return;
+      }
+
+      const timeout = setTimeout(() => {
+        console.log('getBypassFullscreen timeout, using default');
+        resolve('1');
+      }, 2000);
+
+      try {
+        chrome.storage.sync.get('bypassFullscreen', function (data) {
+          clearTimeout(timeout);
+          
+          if (chrome.runtime.lastError) {
+            console.log('Error getting bypassFullscreen:', chrome.runtime.lastError);
+            resolve('1');
+          } else {
+            const bypassFullscreen = data.bypassFullscreen || '1';
+            resolve(bypassFullscreen);
+          }
+        });
+      } catch (error) {
+        clearTimeout(timeout);
+        console.log('Exception getting bypassFullscreen:', error);
+        resolve('1');
+      }
+    });
+  }
+
   // Helper to find button by text
   findButtonByText(textOptions) {
     const buttons = Array.from(document.querySelectorAll('button'));
@@ -349,11 +392,11 @@ class QuizSolver {
       closeBtn.click();
       
       console.log('Popup clicked! Quiz is about to start. Activating fullscreen bypass...');
-      await new Promise(resolve => setTimeout(resolve, 300));
-      await this.exploitFullscreenBypass();
+      // await new Promise(resolve => setTimeout(resolve, 300));
+      this.exploitFullscreenBypass();
     } else {
       console.log('No popup found, quiz may already be active');
-      await this.exploitFullscreenBypass();
+      this.exploitFullscreenBypass();
     }
     
     setTimeout(() => {
@@ -491,6 +534,115 @@ class QuizSolver {
     }))
   }
 
+  showErrorPopup(message, onRetry) {
+    const background = document.querySelector('div.flex-1.pt-8.min-h-\\[78vh\\]') || document.body;
+    if (background) background.style.backgroundColor = '#ff605f';
+
+    if (!document.getElementById('quiz-solver-error-container')) {
+      const errorContainer = document.createElement('div');
+      errorContainer.id = 'quiz-solver-error-container';
+      Object.assign(errorContainer.style, {
+          position: 'fixed',
+          bottom: '20px',
+          right: '20px',
+          zIndex: '10001',
+          backgroundColor: 'white',
+          border: '3px solid red',
+          borderRadius: '8px',
+          padding: '15px',
+          paddingTop: '35px',
+          maxWidth: '400px',
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)'
+      });
+
+      const closeButton = document.createElement('button');
+      closeButton.textContent = '×';
+      Object.assign(closeButton.style, {
+          position: 'absolute',
+          top: '5px',
+          right: '10px',
+          backgroundColor: 'transparent',
+          border: 'none',
+          fontSize: '24px',
+          color: '#999',
+          cursor: 'pointer',
+          fontWeight: 'bold',
+          lineHeight: '1',
+          padding: '0',
+          width: '30px',
+          height: '30px'
+      });
+
+      closeButton.addEventListener('click', () => {
+        errorContainer.remove();
+      });
+
+      closeButton.addEventListener('mouseenter', () => {
+        closeButton.style.color = 'red';
+      });
+
+      closeButton.addEventListener('mouseleave', () => {
+        closeButton.style.color = '#999';
+      });
+
+      const errorTitle = document.createElement('div');
+      errorTitle.textContent = 'Error Occurred';
+      Object.assign(errorTitle.style, {
+          fontSize: '16px',
+          fontWeight: 'bold',
+          color: 'red',
+          marginBottom: '10px'
+      });
+
+      const errorMessage = document.createElement('div');
+      errorMessage.textContent = message;
+      Object.assign(errorMessage.style, {
+          fontSize: '13px',
+          color: '#333',
+          marginBottom: '12px',
+          wordWrap: 'break-word',
+          backgroundColor: '#f9f9f9',
+          padding: '8px',
+          borderRadius: '4px',
+          fontFamily: 'monospace'
+      });
+
+      const retryButton = document.createElement('button');
+      retryButton.id = 'quiz-solver-retry-btn';
+      retryButton.textContent = 'Retry';
+      Object.assign(retryButton.style, {
+          backgroundColor: 'red',
+          color: 'white',
+          padding: '10px 20px',
+          borderRadius: '5px',
+          border: 'none',
+          cursor: 'pointer',
+          fontWeight: 'bold',
+          fontSize: '14px',
+          width: '100%'
+      });
+      
+      retryButton.addEventListener('click', () => {
+        errorContainer.remove();
+        if (onRetry) onRetry();
+      });
+
+      retryButton.addEventListener('mouseenter', () => {
+        retryButton.style.backgroundColor = '#cc0000';
+      });
+
+      retryButton.addEventListener('mouseleave', () => {
+        retryButton.style.backgroundColor = 'red';
+      });
+
+      errorContainer.appendChild(closeButton);
+      errorContainer.appendChild(errorTitle);
+      errorContainer.appendChild(errorMessage);
+      errorContainer.appendChild(retryButton);
+      document.body.appendChild(errorContainer);
+    }
+  }
+
   async main(qna = null, retryBtn = false) {
     if (retryBtn) {
       if (this.modal !== null) this.removeModalWindow()
@@ -502,8 +654,12 @@ class QuizSolver {
     }
 
     if (!qna) {
-        console.error("No quiz data available. Interceptor might have missed the request or page hasn't loaded data yet.");
-        // alert("No quiz data found! Please refresh the page to capture the quiz data.");
+        const msg = "No quiz data available. Interceptor might have missed the request or page hasn't loaded data yet.";
+        console.error(msg);
+        this.showErrorPopup(msg, () => {
+            this.reset();
+            this.main(qna, true);
+        });
         return;
     }
 
@@ -511,156 +667,16 @@ class QuizSolver {
         this.ansData = await this.getQuizAnswers(qna)
         this.startSolvingQuiz()
       } catch (error) {
-        const background = document.querySelector('div.flex-1.pt-8.min-h-\\[78vh\\]') || document.body;
-        if (background) background.style.backgroundColor = '#ff605f';
-
-        if (!document.getElementById('quiz-solver-error-container')) {
-          const errorContainer = document.createElement('div');
-          errorContainer.id = 'quiz-solver-error-container';
-          Object.assign(errorContainer.style, {
-              position: 'fixed',
-              bottom: '20px',
-              right: '20px',
-              zIndex: '10001',
-              backgroundColor: 'white',
-              border: '3px solid red',
-              borderRadius: '8px',
-              padding: '15px',
-              paddingTop: '35px',
-              maxWidth: '400px',
-              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)'
-          });
-
-          const closeButton = document.createElement('button');
-          closeButton.textContent = '×';
-          Object.assign(closeButton.style, {
-              position: 'absolute',
-              top: '5px',
-              right: '10px',
-              backgroundColor: 'transparent',
-              border: 'none',
-              fontSize: '24px',
-              color: '#999',
-              cursor: 'pointer',
-              fontWeight: 'bold',
-              lineHeight: '1',
-              padding: '0',
-              width: '30px',
-              height: '30px'
-          });
-
-          closeButton.addEventListener('click', () => {
-            errorContainer.remove();
-          });
-
-          closeButton.addEventListener('mouseenter', () => {
-            closeButton.style.color = 'red';
-          });
-
-          closeButton.addEventListener('mouseleave', () => {
-            closeButton.style.color = '#999';
-          });
-
-          const errorTitle = document.createElement('div');
-          errorTitle.textContent = 'Error Occurred';
-          Object.assign(errorTitle.style, {
-              fontSize: '16px',
-              fontWeight: 'bold',
-              color: 'red',
-              marginBottom: '10px'
-          });
-
-          const errorMessage = document.createElement('div');
-          errorMessage.textContent = error.message || String(error);
-          Object.assign(errorMessage.style, {
-              fontSize: '13px',
-              color: '#333',
-              marginBottom: '12px',
-              wordWrap: 'break-word',
-              backgroundColor: '#f9f9f9',
-              padding: '8px',
-              borderRadius: '4px',
-              fontFamily: 'monospace'
-          });
-
-          const retryButton = document.createElement('button');
-          retryButton.id = 'quiz-solver-retry-btn';
-          retryButton.textContent = 'Retry';
-          Object.assign(retryButton.style, {
-              backgroundColor: 'red',
-              color: 'white',
-              padding: '10px 20px',
-              borderRadius: '5px',
-              border: 'none',
-              cursor: 'pointer',
-              fontWeight: 'bold',
-              fontSize: '14px',
-              width: '100%'
-          });
-          
-          retryButton.addEventListener('click', () => {
-            errorContainer.remove();
+        this.showErrorPopup(error.message || String(error), () => {
             this.reset();
             this.main(qna, true);
-          });
-
-          retryButton.addEventListener('mouseenter', () => {
-            retryButton.style.backgroundColor = '#cc0000';
-          });
-
-          retryButton.addEventListener('mouseleave', () => {
-            retryButton.style.backgroundColor = 'red';
-          });
-
-          errorContainer.appendChild(closeButton);
-          errorContainer.appendChild(errorTitle);
-          errorContainer.appendChild(errorMessage);
-          errorContainer.appendChild(retryButton);
-          document.body.appendChild(errorContainer);
-        }
+        });
         console.error('Quiz Solver Error:', error);
       }
   }
 
-  getBypassFullscreen() {
-    return new Promise((resolve) => {
-      if (!QuizSolver.isChromeRuntimeAvailable()) {
-        resolve('1');
-        return;
-      }
-      
-      if (!chrome.storage || !chrome.storage.sync) {
-        resolve('1');
-        return;
-      }
-
-      const timeout = setTimeout(() => {
-        console.log('getBypassFullscreen timeout, using default');
-        resolve('1');
-      }, 2000);
-
-      try {
-        chrome.storage.sync.get('bypassFullscreen', function (data) {
-          clearTimeout(timeout);
-          
-          if (chrome.runtime.lastError) {
-            console.log('Error getting bypassFullscreen:', chrome.runtime.lastError);
-            resolve('1');
-          } else {
-            const bypassFullscreen = data.bypassFullscreen || '1';
-            resolve(bypassFullscreen);
-          }
-        });
-      } catch (error) {
-        clearTimeout(timeout);
-        console.log('Exception getting bypassFullscreen:', error);
-        resolve('1');
-      }
-    });
-  }
-
   async exploitFullscreenBypass() {
-    const bypassEnabled = await this.getBypassFullscreen();
+    const bypassEnabled = this.bypassEnabled;
     
     if (bypassEnabled !== '1') {
       console.log('Fullscreen bypass is disabled in settings');
@@ -912,29 +928,91 @@ class QuizSolver {
   handleUrlChange(url) {
     const lessonsRegex = /\/livebooks\/\d+\/[a-f0-9-]+\/lessons$/;
     
+    // Check for broader livebook match to wake up server early
+    if (/\/livebooks\/\d+/.test(url)) {
+      console.log('Livebook page detected. Waking up server...');
+      //Wakeup server only if it has been more than 10 minutes since last wakeup or if it has never been woken up
+      if (!this.serverWakeUpTimeStamp || Date.now() - this.serverWakeUpTimeStamp > 600000) {
+        this.wakeUpServer();
+        this.serverWakeUpTimeStamp = Date.now();
+      }
+    }
+    
     if (lessonsRegex.test(url)) {
       console.log('Quiz page detected via URL change. Reinitializing...');
       setTimeout(() => {
-        this.reinitialize();
+        this.initialize(false);
       }, 500);
     } else {
       console.log('Not a quiz page URL. Skipping initialization.');
     }
   }
 
-  async reinitialize() {
-    console.log('Reinitializing extension for new quiz page...');
+  async initializeCore() {
+    console.log('Initializing core configuration...');
+
+    this.autoStart = await this.getAutoStart()
+    this.bypassEnabled = await this.getBypassFullscreen()
+    this.AI_MODEL = await this.getAiModel()
+    this.delay = await this.getWaitFor()
+
+    // Check if all three API keys are missing
+    const allKeysMissing = !this.C_API_KEY && !this.G_API_KEY && !this.X_API_KEY;
+    
+    if (allKeysMissing) {
+        const cKey = prompt('Please enter your OpenAI API Key (or leave empty to skip)');
+        if (cKey && cKey.trim()) {
+            this.C_API_KEY = String(cKey.trim());
+            localStorage.setItem('C_API_KEY', this.C_API_KEY);
+            if (QuizSolver.isChromeRuntimeAvailable() && chrome.storage) {
+              chrome.storage.local.set({ C_API_KEY: this.C_API_KEY });
+            }
+            console.log('OpenAI API Key Provided:', this.C_API_KEY);
+        }
+
+        const gKey = prompt('Please enter your Google API Key (or leave empty to skip)');
+        if (gKey && gKey.trim()) {
+            this.G_API_KEY = String(gKey.trim());
+            localStorage.setItem('G_API_KEY', this.G_API_KEY);
+            if (QuizSolver.isChromeRuntimeAvailable() && chrome.storage) {
+              chrome.storage.local.set({ G_API_KEY: this.G_API_KEY });
+            }
+            console.log('Google API Key Provided:', this.G_API_KEY);
+        }
+
+        const xKey = prompt('Please enter your Grok API Key (or leave empty to skip)');
+        if (xKey && xKey.trim()) {
+            this.X_API_KEY = String(xKey.trim());
+            localStorage.setItem('X_API_KEY', this.X_API_KEY);
+            if (QuizSolver.isChromeRuntimeAvailable() && chrome.storage) {
+              chrome.storage.local.set({ X_API_KEY: this.X_API_KEY });
+            }
+            console.log('Grok API Key Provided:', this.X_API_KEY);
+        }
+    }
+
+    console.log('Core configuration initialized');
+    console.log('Max wait time (delay): ', this.delay, 'seconds')
+    console.log('Auto Start: ', this.autoStart === '1' ? 'Yes' : 'No')
+    console.log('AI Model: ', this.AI_MODEL)
+  }
+
+  async initialize(checkUrl = true) {
+    console.log('Initializing extension...');
     
     await this.reset();
     
+    if (checkUrl) {
     const lessonsRegex = /\/livebooks\/\d+\/[a-f0-9-]+\/lessons$/;
     if (!lessonsRegex.test(window.location.href)) {
-      console.log('URL validation failed during reinitialization.');
+      console.log('URL validation failed or not a quiz page.');
       return;
+    } else {
+        console.log('URL matches lesson page structure. Script will activate.');
+      }
     }
 
-    this.autoStart = await this.getAutoStart();
-    this.AI_MODEL = await this.getAiModel();
+    await this.initializeCore();
 
     if (this.autoStart === '1') {
       console.log('Auto-start enabled. Waiting for Start Quiz or Retake Quiz button...');
@@ -950,9 +1028,9 @@ class QuizSolver {
       await this.init();
     }
 
-    console.log('Reinitialization complete');
-    console.log('Auto Start:', this.autoStart === '1' ? 'Yes' : 'No');
-    console.log('AI Model:', this.AI_MODEL);
+    console.log('Initialization complete');
+    console.log('Foreground script running')
+    console.log('Using smart DOM detection - will proceed as soon as elements are ready')
   }
 
   async runScript() {
@@ -1019,85 +1097,10 @@ class QuizSolver {
     });
 
     // Wait for DOM for the rest
-    const initLogic = async () => {
-        console.log('Running DOM-dependent logic');
-        
-        // URL Validation
-        const currentUrl = window.location.href;
-        const lessonsRegex = /\/livebooks\/\d+\/[a-f0-9-]+\/lessons$/;
-        
-        if (!lessonsRegex.test(currentUrl)) {
-            console.log("URL does not match lesson page structure. Script will not activate.");
-            return;
-        }
-
-        // Wake up server immediately
-        this.wakeUpServer();
-
-        this.autoStart = await this.getAutoStart()
-        this.AI_MODEL = await this.getAiModel()
-        this.delay = await this.getWaitFor()
-
-        // Check if all three API keys are missing
-        const allKeysMissing = !this.C_API_KEY && !this.G_API_KEY && !this.X_API_KEY;
-        
-        if (allKeysMissing) {
-            const cKey = prompt('Please enter your OpenAI API Key (or leave empty to skip)');
-            if (cKey && cKey.trim()) {
-                this.C_API_KEY = String(cKey.trim());
-                localStorage.setItem('C_API_KEY', this.C_API_KEY);
-                if (QuizSolver.isChromeRuntimeAvailable() && chrome.storage) {
-                  chrome.storage.local.set({ C_API_KEY: this.C_API_KEY });
-                }
-                console.log('OpenAI API Key Provided:', this.C_API_KEY);
-            }
-
-            const gKey = prompt('Please enter your Google API Key (or leave empty to skip)');
-            if (gKey && gKey.trim()) {
-                this.G_API_KEY = String(gKey.trim());
-                localStorage.setItem('G_API_KEY', this.G_API_KEY);
-                if (QuizSolver.isChromeRuntimeAvailable() && chrome.storage) {
-                  chrome.storage.local.set({ G_API_KEY: this.G_API_KEY });
-                }
-                console.log('Google API Key Provided:', this.G_API_KEY);
-            }
-
-            const xKey = prompt('Please enter your Grok API Key (or leave empty to skip)');
-            if (xKey && xKey.trim()) {
-                this.X_API_KEY = String(xKey.trim());
-                localStorage.setItem('X_API_KEY', this.X_API_KEY);
-                if (QuizSolver.isChromeRuntimeAvailable() && chrome.storage) {
-                  chrome.storage.local.set({ X_API_KEY: this.X_API_KEY });
-                }
-                console.log('Grok API Key Provided:', this.X_API_KEY);
-            }
-        }
-
-        if (this.autoStart === '1') {
-            console.log('Auto-start enabled. Waiting for Start Quiz or Retake Quiz button...');
-            const quizBtn = await this.waitForElement(null, ['Start Quiz', 'Retake Quiz'], this.delay * 1000);
-            if (quizBtn) {
-                const buttonText = quizBtn.textContent.trim();
-                console.log(`${buttonText} button detected. Auto-clicking...`);
-                this.start(true);
-            } else {
-                console.log('Start Quiz or Retake Quiz button not found within timeout.');
-            }
-        } else {
-            await this.init();
-        }
-
-        console.log('Foreground script running')
-        console.log('Max wait time (delay): ', this.delay, 'seconds')
-        console.log('Auto Start: ', this.autoStart === '1' ? 'Yes' : 'No')
-        console.log('AI Model: ', this.AI_MODEL)
-        console.log('Using smart DOM detection - will proceed as soon as elements are ready')
-    };
-
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initLogic);
+        document.addEventListener('DOMContentLoaded', () => this.initialize());
     } else {
-        initLogic();
+        this.initialize();
     }
   }
 }
