@@ -16,6 +16,7 @@
     .header {
       display: flex;
       align-items: center;
+      justify-content: space-between;
       padding: 10px 12px;
       background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);
       color: white;
@@ -26,6 +27,11 @@
       display: flex;
       align-items: center;
       text-decoration: none;
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
     }
 
     .header img {
@@ -47,6 +53,23 @@
       font-size: 15px;
       font-weight: 600;
       color: white;
+    }
+
+    .api-button {
+      background-color: white;
+      color: #ff6b6b;
+      border: none;
+      padding: 6px 14px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .api-button:hover {
+      background-color: #ffe0e0;
+      transform: scale(1.05);
     }
 
     .content {
@@ -176,9 +199,14 @@
 
 <body>
   <div class="header">
-    <a href="https://github.com/akash-d-dev/chalvium-quiz-solver-extension" target="_blank">
-      <img src="./img/auto-quiz-logo.png" alt="logo">
-      <h2>Kalvium Auto Quiz</h2>
+    <div class="header-left">
+      <a href="https://github.com/akash-d-dev/chalvium-quiz-solver-extension" target="_blank">
+        <img src="./img/auto-quiz-logo.png" alt="logo">
+        <h2>Kalvium Auto Quiz</h2>
+      </a>
+    </div>
+    <a href="https://k-quiz-solver-api.onrender.com" target="_blank">
+      <button class="api-button">API</button>
     </a>
   </div>
 
