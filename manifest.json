@@ -3,6 +3,12 @@
   "version": "2.0.0",
   "manifest_version": 3,
   "description": "Let's solve the quiz",
+  "icons": {
+    "16": "img/auto-quiz-logo.png",
+    "32": "img/auto-quiz-logo.png",
+    "48": "img/auto-quiz-logo.png",
+    "128": "img/auto-quiz-logo.png"
+  },
   "permissions": [
     "cookies",
     "activeTab",
@@ -16,7 +22,12 @@
     "webNavigation"
   ],
   "action": {
-    "default_popup": "popup.html"
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "img/auto-quiz-logo.png",
+      "32": "img/auto-quiz-logo.png",
+      "48": "img/auto-quiz-logo.png"
+    }
   },
   "background": {
     "service_worker": "./background.js",

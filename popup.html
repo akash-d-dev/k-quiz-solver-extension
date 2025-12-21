@@ -6,10 +6,51 @@
 <head>
   <title>Get Answers</title>
   <style>
-    /* BEGIN: Added CSS */
     body {
       background-color: rgb(255, 208, 208);
       font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      padding: 10px 12px;
+      background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);
+      color: white;
+      border-bottom: 2px solid rgba(255,255,255,0.3);
+    }
+
+    .header a {
+      display: flex;
+      align-items: center;
+      text-decoration: none;
+    }
+
+    .header img {
+      width: 28px;
+      height: 28px;
+      margin-right: 10px;
+      cursor: pointer;
+      border: none;
+      border-radius: 4px;
+      transition: transform 0.2s;
+    }
+
+    .header img:hover {
+      transform: scale(1.1);
+    }
+
+    .header h2 {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 600;
+      color: white;
+    }
+
+    .content {
+      padding: 0;
     }
 
     .flex {
@@ -119,17 +160,7 @@
 
     .image-card {
       margin: 8px;
-    }
-
-    a {
-      display: flex;
-      width: 30px;
-    }
-
-    .image-card {
-      display: flex;
-      justify-content: center;
-      align-items: center;
+      display: none;
     }
 
     span {
@@ -144,6 +175,14 @@
 </head>
 
 <body>
+  <div class="header">
+    <a href="https://github.com/akash-d-dev/chalvium-quiz-solver-extension" target="_blank">
+      <img src="./img/auto-quiz-logo.png" alt="logo">
+      <h2>Kalvium Auto Quiz</h2>
+    </a>
+  </div>
+
+  <div class="content">
   <div class="image-card">
     <a href="https://github.com/akash-d-dev/chalvium-quiz-solver-extension" target="_blank">
       <img src="./img/akash-d-dev.jpg" alt="logo" />
@@ -225,6 +264,7 @@
       <button class="toggle-visibility" data-target="x-api-key">Show</button>
       <button class="save-btn" data-key="X_API_KEY" data-input="x-api-key">Save</button>
     </div>
+  </div>
   </div>
 </body>
 

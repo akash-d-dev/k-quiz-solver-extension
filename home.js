@@ -5,7 +5,7 @@ let aiModel = 'gemini-2.5-flash';
 
 function updateApiKeyStatus(keyName, statusElement, inputElement) {
   const value = inputElement.value.trim();
-  if (value) {
+  if (value && value !== 'null') {
     statusElement.textContent = '(Present)';
     statusElement.className = 'api-key-status present';
   } else {
@@ -16,21 +16,21 @@ function updateApiKeyStatus(keyName, statusElement, inputElement) {
 
 function loadApiKeysFromStorage() {
   chrome.storage.local.get(['C_API_KEY', 'G_API_KEY', 'X_API_KEY'], function (data) {
-    if (data.C_API_KEY) {
+    if (data.C_API_KEY && data.C_API_KEY !== 'null') {
       document.getElementById('c-api-key').value = data.C_API_KEY;
       updateApiKeyStatus('C_API_KEY', document.getElementById('c-key-status'), document.getElementById('c-api-key'));
     } else {
       updateApiKeyStatus('C_API_KEY', document.getElementById('c-key-status'), document.getElementById('c-api-key'));
     }
 
-    if (data.G_API_KEY) {
+    if (data.G_API_KEY && data.G_API_KEY !== 'null') {
       document.getElementById('g-api-key').value = data.G_API_KEY;
       updateApiKeyStatus('G_API_KEY', document.getElementById('g-key-status'), document.getElementById('g-api-key'));
     } else {
       updateApiKeyStatus('G_API_KEY', document.getElementById('g-key-status'), document.getElementById('g-api-key'));
     }
 
-    if (data.X_API_KEY) {
+    if (data.X_API_KEY && data.X_API_KEY !== 'null') {
       document.getElementById('x-api-key').value = data.X_API_KEY;
       updateApiKeyStatus('X_API_KEY', document.getElementById('x-key-status'), document.getElementById('x-api-key'));
     } else {
