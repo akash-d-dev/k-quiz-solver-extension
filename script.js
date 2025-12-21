@@ -2,6 +2,18 @@ class QuizSolver {
   static apiUrl = 'https://k-quiz-solver-api.onrender.com'
   // static apiUrl = 'http://localhost:8000';
 
+  static isChromeRuntimeAvailable() {
+    try {
+      return !!(
+        typeof chrome !== 'undefined' &&
+        chrome.runtime &&
+        chrome.runtime.id
+      );
+    } catch (error) {
+      return false;
+    }
+  }
+
   constructor() {
     this.ansArray = [-1, -1, -1, -1, -1]
     this.ansData = [null, null, null, null, null]
@@ -21,22 +33,39 @@ class QuizSolver {
   }
 
   async syncKeysFromChromeStorage() {
-    if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.local) {
+    if (typeof chrome === 'undefined') {
+      console.log('Chrome API not available, skipping sync');
+      return;
+    }
+
+    if (!chrome.storage || !chrome.storage.local) {
       console.log('Chrome storage API not available, skipping sync');
+      return;
+    }
+
+    if (!chrome.runtime || !chrome.runtime.id) {
+      console.log('Chrome runtime not ready, skipping sync');
       return;
     }
     
     try {
       const keys = await new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          reject(new Error('Storage operation timeout'));
+        }, 3000);
+
         try {
           chrome.storage.local.get(['C_API_KEY', 'G_API_KEY', 'X_API_KEY'], (result) => {
+            clearTimeout(timeout);
+            
             if (chrome.runtime.lastError) {
               reject(chrome.runtime.lastError);
             } else {
-              resolve(result);
+              resolve(result || {});
             }
           });
         } catch (err) {
+          clearTimeout(timeout);
           reject(err);
         }
       });
@@ -150,12 +179,25 @@ class QuizSolver {
 
   getAutoStart() {
     return new Promise((resolve) => {
-      if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.sync) {
+      if (!QuizSolver.isChromeRuntimeAvailable()) {
         resolve('0');
         return;
       }
+      
+      if (!chrome.storage || !chrome.storage.sync) {
+        resolve('0');
+        return;
+      }
+
+      const timeout = setTimeout(() => {
+        console.log('getAutoStart timeout, using default');
+        resolve('0');
+      }, 2000);
+
       try {
         chrome.storage.sync.get('autoStart', function (data) {
+          clearTimeout(timeout);
+          
           if (chrome.runtime.lastError) {
             console.log('Error getting autoStart:', chrome.runtime.lastError);
             resolve('0');
@@ -165,6 +207,7 @@ class QuizSolver {
           }
         });
       } catch (error) {
+        clearTimeout(timeout);
         console.log('Exception getting autoStart:', error);
         resolve('0');
       }
@@ -173,12 +216,25 @@ class QuizSolver {
 
   getAiModel() {
     return new Promise((resolve) => {
-      if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.sync) {
+      if (!QuizSolver.isChromeRuntimeAvailable()) {
         resolve('gemini-2.5-flash');
         return;
       }
+      
+      if (!chrome.storage || !chrome.storage.sync) {
+        resolve('gemini-2.5-flash');
+        return;
+      }
+
+      const timeout = setTimeout(() => {
+        console.log('getAiModel timeout, using default');
+        resolve('gemini-2.5-flash');
+      }, 2000);
+
       try {
         chrome.storage.sync.get('aiModel', function (data) {
+          clearTimeout(timeout);
+          
           if (chrome.runtime.lastError) {
             console.log('Error getting aiModel:', chrome.runtime.lastError);
             resolve('gemini-2.5-flash');
@@ -188,6 +244,7 @@ class QuizSolver {
           }
         });
       } catch (error) {
+        clearTimeout(timeout);
         console.log('Exception getting aiModel:', error);
         resolve('gemini-2.5-flash');
       }
@@ -196,12 +253,25 @@ class QuizSolver {
 
   getWaitFor() {
     return new Promise((resolve) => {
-      if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.sync) {
+      if (!QuizSolver.isChromeRuntimeAvailable()) {
         resolve(30);
         return;
       }
+      
+      if (!chrome.storage || !chrome.storage.sync) {
+        resolve(30);
+        return;
+      }
+
+      const timeout = setTimeout(() => {
+        console.log('getWaitFor timeout, using default');
+        resolve(30);
+      }, 2000);
+
       try {
         chrome.storage.sync.get('delay', function (data) {
+          clearTimeout(timeout);
+          
           if (chrome.runtime.lastError) {
             console.log('Error getting delay:', chrome.runtime.lastError);
             resolve(30);
@@ -211,6 +281,7 @@ class QuizSolver {
           }
         });
       } catch (error) {
+        clearTimeout(timeout);
         console.log('Exception getting delay:', error);
         resolve(30);
       }
@@ -553,12 +624,25 @@ class QuizSolver {
 
   getBypassFullscreen() {
     return new Promise((resolve) => {
-      if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.sync) {
+      if (!QuizSolver.isChromeRuntimeAvailable()) {
         resolve('1');
         return;
       }
+      
+      if (!chrome.storage || !chrome.storage.sync) {
+        resolve('1');
+        return;
+      }
+
+      const timeout = setTimeout(() => {
+        console.log('getBypassFullscreen timeout, using default');
+        resolve('1');
+      }, 2000);
+
       try {
         chrome.storage.sync.get('bypassFullscreen', function (data) {
+          clearTimeout(timeout);
+          
           if (chrome.runtime.lastError) {
             console.log('Error getting bypassFullscreen:', chrome.runtime.lastError);
             resolve('1');
@@ -568,6 +652,7 @@ class QuizSolver {
           }
         });
       } catch (error) {
+        clearTimeout(timeout);
         console.log('Exception getting bypassFullscreen:', error);
         resolve('1');
       }
@@ -582,33 +667,72 @@ class QuizSolver {
       return false;
     }
 
-    console.log('🔓 Activating fullscreen bypass exploit...');
-    console.log('Step 1: Sending message to background script...');
+    console.log('Activating fullscreen bypass exploit...');
+    console.log('Step 1: Checking Chrome runtime availability...');
     
+    if (typeof chrome === 'undefined') {
+      console.log('Chrome object not available, bypass skipped');
+      return false;
+    }
+
+    if (!chrome.runtime) {
+      console.log('chrome.runtime not available, waiting for initialization...');
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      if (!chrome.runtime) {
+        console.log('chrome.runtime still not available after wait, bypass skipped');
+        return false;
+      }
+    }
+
     try {
-      if (typeof chrome === 'undefined' || !chrome.runtime || !chrome.runtime.sendMessage) {
-        console.log('⚠️ Chrome runtime not available, bypass skipped');
+      if (!chrome.runtime.id) {
+        console.log('Extension context invalidated (no runtime.id), bypass skipped');
         return false;
       }
 
-      const response = await chrome.runtime.sendMessage({ 
-        action: 'bypassFullscreen'
+      if (!chrome.runtime.sendMessage) {
+        console.log('chrome.runtime.sendMessage not available, bypass skipped');
+        return false;
+      }
+
+      console.log('Step 2: Sending message to background script...');
+      
+      const response = await new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          reject(new Error('Timeout: No response from background script'));
+        }, 5000);
+
+        chrome.runtime.sendMessage(
+          { action: 'bypassFullscreen' },
+          (response) => {
+            clearTimeout(timeout);
+            
+            if (chrome.runtime.lastError) {
+              reject(new Error(chrome.runtime.lastError.message));
+            } else {
+              resolve(response);
+            }
+          }
+        );
       });
       
-      console.log('Step 2: Received response from background:', response);
+      console.log('Step 3: Received response from background:', response);
       
       if (response && response.success) {
-        console.log('✅ Fullscreen bypass successful! Quiz running without restrictions.');
+        console.log('Fullscreen bypass successful! Quiz running without restrictions.');
         return true;
       } else {
-        console.log('❌ Fullscreen bypass failed:', response ? response.error : 'No response');
+        console.log('Fullscreen bypass failed:', response ? response.error : 'No response');
         return false;
       }
     } catch (error) {
       if (error.message && error.message.includes('Extension context invalidated')) {
-        console.log('⚠️ Extension was reloaded. Bypass skipped. Reload the page to use bypass.');
+        console.log('Extension was reloaded. Bypass skipped. Reload the page to use bypass.');
+      } else if (error.message && error.message.includes('Timeout')) {
+        console.log('Background script did not respond in time:', error.message);
       } else {
-        console.log('❌ Fullscreen bypass error:', error.message || error);
+        console.log('Fullscreen bypass error:', error.message || error);
       }
       return false;
     }
@@ -834,13 +958,17 @@ class QuizSolver {
   async runScript() {
     console.log('Running auto quiz solver')
 
-    const script = document.createElement('script');
-    script.src = chrome.runtime.getURL('interceptor.js');
-    script.onload = function() {
-        this.remove();
-    };
-    (document.head || document.documentElement).appendChild(script);
-    console.log("Interceptor injected from script.js via SRC");
+    if (QuizSolver.isChromeRuntimeAvailable() && chrome.runtime.getURL) {
+      const script = document.createElement('script');
+      script.src = chrome.runtime.getURL('interceptor.js');
+      script.onload = function() {
+          this.remove();
+      };
+      (document.head || document.documentElement).appendChild(script);
+      console.log("Interceptor injected from script.js via SRC");
+    } else {
+      console.log("Chrome runtime not available, skipping interceptor injection");
+    }
 
     // Listen for intercepted data
     window.addEventListener('message', (event) => {
@@ -918,7 +1046,9 @@ class QuizSolver {
             if (cKey && cKey.trim()) {
                 this.C_API_KEY = String(cKey.trim());
                 localStorage.setItem('C_API_KEY', this.C_API_KEY);
-                chrome.storage.local.set({ C_API_KEY: this.C_API_KEY });
+                if (QuizSolver.isChromeRuntimeAvailable() && chrome.storage) {
+                  chrome.storage.local.set({ C_API_KEY: this.C_API_KEY });
+                }
                 console.log('OpenAI API Key Provided:', this.C_API_KEY);
             }
 
@@ -926,7 +1056,9 @@ class QuizSolver {
             if (gKey && gKey.trim()) {
                 this.G_API_KEY = String(gKey.trim());
                 localStorage.setItem('G_API_KEY', this.G_API_KEY);
-                chrome.storage.local.set({ G_API_KEY: this.G_API_KEY });
+                if (QuizSolver.isChromeRuntimeAvailable() && chrome.storage) {
+                  chrome.storage.local.set({ G_API_KEY: this.G_API_KEY });
+                }
                 console.log('Google API Key Provided:', this.G_API_KEY);
             }
 
@@ -934,7 +1066,9 @@ class QuizSolver {
             if (xKey && xKey.trim()) {
                 this.X_API_KEY = String(xKey.trim());
                 localStorage.setItem('X_API_KEY', this.X_API_KEY);
-                chrome.storage.local.set({ X_API_KEY: this.X_API_KEY });
+                if (QuizSolver.isChromeRuntimeAvailable() && chrome.storage) {
+                  chrome.storage.local.set({ X_API_KEY: this.X_API_KEY });
+                }
                 console.log('Grok API Key Provided:', this.X_API_KEY);
             }
         }
